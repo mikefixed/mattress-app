@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  /* Color tokens */
+  --ink: #16223F;        /* deep navy — brand, headings, primary buttons */
+  --ink-soft: #48547A;   /* secondary text, muted labels */
+  --paper: #F5F3EF;      /* warm neutral background */
+  --surface: #FFFFFF;    /* card surfaces */
+  --line: #E4E1D8;       /* borders, dividers */
+  --gold: #B9812E;       /* accent — CTAs, active states, highlights */
+  --gold-soft: #F0DFB8;  /* accent backgrounds */
+  --success: #2F8F5B;
+  --success-soft: #DCEFE4;
+  --danger: #C1443D;
+  --danger-soft: #F6DEDC;
+
+  --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jbmono), ui-monospace, monospace;
+}
+
+* {
+  border-color: var(--line);
+}
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Signature texture: ticking-stripe pattern, evokes mattress fabric.
+   Used sparingly — login hero + empty states only. */
+.tick-stripes {
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(185, 129, 46, 0.10) 0px,
+    rgba(185, 129, 46, 0.10) 2px,
+    transparent 2px,
+    transparent 26px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
