@@ -41,6 +41,17 @@ export interface Sale {
   customer_phone: string | null
   payment_method: 'cash' | 'transfer' | 'pos' | 'credit'
   total_amount: number
+  amount_paid: number
+  created_at: string
+}
+
+export interface DebtPayment {
+  id: string
+  sale_id: string
+  store_id: string
+  amount: number
+  note: string | null
+  recorded_by: string | null
   created_at: string
 }
 

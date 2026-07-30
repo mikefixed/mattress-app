@@ -51,6 +51,7 @@ create table if not exists sales (
   customer_phone text,
   payment_method text not null default 'cash' check (payment_method in ('cash','transfer','pos','credit')),
   total_amount numeric(12,2) not null default 0,
+  amount_paid numeric(12,2) not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -74,11 +75,24 @@ create table if not exists inventory_movements (
   created_at timestamptz not null default now()
 );
 
+-- A running log of payments received against a credit sale (a "debt").
+create table if not exists debt_payments (
+  id uuid primary key default uuid_generate_v4(),
+  sale_id uuid not null references sales(id) on delete cascade,
+  store_id uuid not null references stores(id) on delete cascade,
+  amount numeric(12,2) not null,
+  note text,
+  recorded_by uuid references profiles(id),
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_products_store on products(store_id);
 create index if not exists idx_sales_store on sales(store_id);
 create index if not exists idx_sale_items_sale on sale_items(sale_id);
 create index if not exists idx_inv_move_store on inventory_movements(store_id);
 create index if not exists idx_profiles_store on profiles(store_id);
+create index if not exists idx_debt_payments_sale on debt_payments(sale_id);
+create index if not exists idx_debt_payments_store on debt_payments(store_id);
 
 -- ---------- HELPER FUNCTIONS (security definer, avoid RLS recursion) ----------
 
@@ -105,6 +119,7 @@ alter table products enable row level security;
 alter table sales enable row level security;
 alter table sale_items enable row level security;
 alter table inventory_movements enable row level security;
+alter table debt_payments enable row level security;
 
 -- STORES: CEO sees/manages all. Manager & staff see only their own store.
 create policy "stores_select" on stores for select
@@ -169,6 +184,12 @@ create policy "sale_items_insert" on sale_items for insert
 create policy "inv_move_select" on inventory_movements for select
   using (is_ceo() or store_id = my_store());
 create policy "inv_move_insert" on inventory_movements for insert
+  with check (is_ceo() or store_id = my_store());
+
+-- DEBT PAYMENTS: same store-scoping pattern
+create policy "debt_payments_select" on debt_payments for select
+  using (is_ceo() or store_id = my_store());
+create policy "debt_payments_insert" on debt_payments for insert
   with check (is_ceo() or store_id = my_store());
 
 -- ---------- TRIGGER: keep products.updated_at fresh ----------

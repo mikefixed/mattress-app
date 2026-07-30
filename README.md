@@ -114,6 +114,10 @@ supabase/
   schema.sql          full database schema + RLS policies — run this first
 ```
 
+## Updating an existing deployment
+
+If your app is already live and you're pulling in new features (credit sales / debtor tracking), run `supabase/migrations/002_debt_tracking.sql` once in the Supabase SQL Editor — it's additive and safe to run on a database that already has `schema.sql` applied. A fresh install only needs `schema.sql`, which already includes everything.
+
 ## Notes
 
 - Currency is formatted in Naira (₦) — change the `naira()` helper functions in the dashboard components if you need a different currency.

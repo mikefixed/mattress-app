@@ -14,6 +14,7 @@ import {
   BedDouble,
   Menu,
   X,
+  HandCoins,
 } from 'lucide-react'
 import type { Role } from '@/lib/types'
 
@@ -21,6 +22,7 @@ const NAV = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, roles: ['ceo', 'manager', 'staff'] },
   { href: '/dashboard/sales', label: 'Sales', icon: ShoppingCart, roles: ['ceo', 'manager', 'staff'] },
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package, roles: ['ceo', 'manager', 'staff'] },
+  { href: '/dashboard/debtors', label: 'Debtors', icon: HandCoins, roles: ['ceo', 'manager'] },
   { href: '/dashboard/staff', label: 'Staff', icon: Users, roles: ['ceo', 'manager'] },
   { href: '/dashboard/stores', label: 'Stores', icon: Store, roles: ['ceo'] },
 ]
