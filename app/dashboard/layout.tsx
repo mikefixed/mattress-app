@@ -5,7 +5,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { profile } = await getCurrentProfile()
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--paper)' }}>
+    <div className="min-h-screen flex flex-col lg:flex-row" style={{ background: 'var(--paper)' }}>
       <Sidebar role={profile.role} fullName={profile.full_name} />
       <main className="flex-1 min-w-0">{children}</main>
     </div>

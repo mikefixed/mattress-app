@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -12,6 +12,8 @@ import {
   Store,
   LogOut,
   BedDouble,
+  Menu,
+  X,
 } from 'lucide-react'
 import type { Role } from '@/lib/types'
 
@@ -27,6 +29,7 @@ export default function Sidebar({ role, fullName }: { role: Role; fullName: stri
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [open, setOpen] = useState(false)
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -36,55 +39,98 @@ export default function Sidebar({ role, fullName }: { role: Role; fullName: stri
 
   const items = NAV.filter((item) => item.roles.includes(role))
 
-  return (
-    <aside
-      className="w-60 shrink-0 h-screen sticky top-0 flex flex-col text-white"
-      style={{ background: 'var(--ink)' }}
-    >
-      <div className="flex items-center gap-2.5 px-5 h-16 border-b border-white/10">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--gold)' }}>
-          <BedDouble size={16} color="var(--ink)" />
-        </div>
-        <span className="font-display text-sm font-semibold leading-tight">
-          Amina Abubakar<br />Mattress Stores
-        </span>
+  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
+    <nav className="flex-1 px-3 py-4 space-y-1">
+      {items.map((item) => {
+        const active = pathname === item.href
+        const Icon = item.icon
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
+            style={{
+              background: active ? 'var(--gold)' : 'transparent',
+              color: active ? 'var(--ink)' : 'rgba(255,255,255,0.75)',
+              fontWeight: active ? 600 : 500,
+            }}
+          >
+            <Icon size={17} />
+            {item.label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+
+  const AccountFooter = () => (
+    <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 mb-3">
+        <p className="text-sm font-medium truncate">{fullName}</p>
+        <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--gold)' }}>{role}</p>
       </div>
+      <button
+        onClick={handleSignOut}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full text-white/70 hover:text-white hover:bg-white/5 transition-colors"
+      >
+        <LogOut size={17} />
+        Sign out
+      </button>
+    </div>
+  )
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {items.map((item) => {
-          const active = pathname === item.href
-          const Icon = item.icon
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors"
-              style={{
-                background: active ? 'var(--gold)' : 'transparent',
-                color: active ? 'var(--ink)' : 'rgba(255,255,255,0.75)',
-                fontWeight: active ? 600 : 500,
-              }}
-            >
-              <Icon size={17} />
-              {item.label}
-            </Link>
-          )
-        })}
-      </nav>
-
-      <div className="px-3 py-4 border-t border-white/10">
-        <div className="px-3 mb-3">
-          <p className="text-sm font-medium truncate">{fullName}</p>
-          <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--gold)' }}>{role}</p>
+  return (
+    <>
+      {/* Mobile top bar */}
+      <div
+        className="lg:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 text-white"
+        style={{ background: 'var(--ink)' }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--gold)' }}>
+            <BedDouble size={15} color="var(--ink)" />
+          </div>
+          <span className="font-display text-sm font-semibold truncate">Amina Abubakar Stores</span>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full text-white/70 hover:text-white hover:bg-white/5 transition-colors"
-        >
-          <LogOut size={17} />
-          Sign out
+        <button onClick={() => setOpen(true)} aria-label="Open menu" className="p-1.5 -mr-1.5">
+          <Menu size={22} />
         </button>
       </div>
-    </aside>
+
+      {/* Mobile drawer */}
+      {open && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <div className="relative w-64 max-w-[80vw] h-full flex flex-col text-white" style={{ background: 'var(--ink)' }}>
+            <div className="flex items-center justify-between px-4 h-14 border-b border-white/10">
+              <span className="font-display text-sm font-semibold">Menu</span>
+              <button onClick={() => setOpen(false)} aria-label="Close menu">
+                <X size={20} />
+              </button>
+            </div>
+            <NavLinks onNavigate={() => setOpen(false)} />
+            <AccountFooter />
+          </div>
+        </div>
+      )}
+
+      {/* Desktop rail */}
+      <aside
+        className="hidden lg:flex w-60 shrink-0 h-screen sticky top-0 flex-col text-white"
+        style={{ background: 'var(--ink)' }}
+      >
+        <div className="flex items-center gap-2.5 px-5 h-16 border-b border-white/10">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--gold)' }}>
+            <BedDouble size={16} color="var(--ink)" />
+          </div>
+          <span className="font-display text-sm font-semibold leading-tight">
+            Amina Abubakar<br />Mattress Stores
+          </span>
+        </div>
+        <NavLinks />
+        <AccountFooter />
+      </aside>
+    </>
   )
 }

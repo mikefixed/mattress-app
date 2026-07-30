@@ -26,7 +26,7 @@ export default function StoresClient({ stores }: { stores: Store[] }) {
         }
       />
 
-      <div className="px-8 pb-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="px-4 sm:px-8 pb-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {stores.length === 0 && (
           <p className="text-sm" style={{ color: 'var(--ink-soft)' }}>No stores yet. Add your first branch.</p>
         )}

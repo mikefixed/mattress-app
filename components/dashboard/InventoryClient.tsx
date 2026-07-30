@@ -65,7 +65,7 @@ export default function InventoryClient({
         }
       />
 
-      <div className="px-8 flex flex-wrap items-center gap-3 mb-5">
+      <div className="px-4 sm:px-8 flex flex-wrap items-center gap-3 mb-5">
         {isCeo && (
           <select
             value={storeId ?? ''}
@@ -91,9 +91,10 @@ export default function InventoryClient({
         </div>
       </div>
 
-      <div className="px-8 pb-8">
+      <div className="px-4 sm:px-8 pb-8">
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: 'var(--line)' }}>
                 {['Product', 'Category', 'Size', 'Price', 'Stock', ''].map((h) => (
@@ -146,6 +147,7 @@ export default function InventoryClient({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 

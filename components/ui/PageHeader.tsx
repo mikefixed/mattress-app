@@ -8,7 +8,7 @@ export default function PageHeader({
   action?: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-8 pt-8 pb-6">
+    <div className="flex flex-wrap items-start justify-between gap-4 px-4 sm:px-8 pt-6 sm:pt-8 pb-6">
       <div>
         <h1 className="font-display text-2xl font-semibold" style={{ color: 'var(--ink)' }}>
           {title}

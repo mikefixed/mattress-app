@@ -36,7 +36,7 @@ export default async function DashboardHome() {
         subtitle={isCeo ? 'Performance across all stores' : "Today's snapshot for your store"}
       />
 
-      <div className="px-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="px-4 sm:px-8 grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Sales today" value={naira(todayTotal)} icon={DollarSign} />
         <StatCard label="Sales, all time" value={naira(monthTotal)} icon={ShoppingCart} />
         <StatCard label="Products tracked" value={String((products ?? []).length)} icon={Package} />
@@ -48,7 +48,7 @@ export default async function DashboardHome() {
         />
       </div>
 
-      <div className="px-8 mt-8">
+      <div className="px-4 sm:px-8 mt-8">
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
           <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--line)' }}>
             <h2 className="font-display font-semibold text-sm" style={{ color: 'var(--ink)' }}>

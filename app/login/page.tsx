@@ -93,7 +93,7 @@ export default function LoginPage() {
       </div>
 
       {/* Form panel */}
-      <div className="flex items-center justify-center p-8" style={{ background: 'var(--paper)' }}>
+      <div className="flex items-center justify-center p-6 sm:p-8" style={{ background: 'var(--paper)' }}>
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2 mb-8">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--gold)' }}>

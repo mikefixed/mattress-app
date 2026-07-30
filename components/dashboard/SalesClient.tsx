@@ -64,7 +64,7 @@ export default function SalesClient({
         }
       />
 
-      <div className="px-8 mb-5">
+      <div className="px-4 sm:px-8 mb-5">
         {isCeo && (
           <select
             value={storeId ?? ''}
@@ -78,9 +78,10 @@ export default function SalesClient({
         )}
       </div>
 
-      <div className="px-8 pb-8">
+      <div className="px-4 sm:px-8 pb-8">
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: 'var(--line)' }}>
                 {['Date', 'Customer', 'Sold by', 'Payment', 'Total'].map((h) => (
@@ -106,6 +107,7 @@ export default function SalesClient({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
