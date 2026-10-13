@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/ui/PageHeader'
 import type { Product, Role } from '@/lib/types'
-import { Plus, PackagePlus, X, Search, ArrowUpDown } from 'lucide-react'
+import { Plus, PackagePlus, X, Search, ArrowUpDown, Pencil, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 type Movement = {
@@ -42,6 +42,8 @@ export default function InventoryClient({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [showAdd, setShowAdd] = useState(false)
   const [restockTarget, setRestockTarget] = useState<Product | null>(null)
+  const [editTarget, setEditTarget] = useState<Product | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -90,6 +92,13 @@ export default function InventoryClient({
   }
 
   const naira = (n: number) => `₦${Number(n).toLocaleString('en-NG')}`
+
+  async function handleDeleteMovement(movementId: string) {
+    if (window.confirm('Delete this log entry? Note: This will NOT automatically adjust the current product stock.')) {
+      await supabase.from('inventory_movements').delete().eq('id', movementId)
+      load()
+    }
+  }
 
   return (
     <div>
@@ -155,7 +164,7 @@ export default function InventoryClient({
       <div className="px-4 sm:px-8 pb-6">
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[700px] text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: 'var(--line)' }}>
                 <th className="px-5 py-3 font-medium cursor-pointer select-none" style={{ color: 'var(--ink-soft)' }} onClick={() => toggleSort('name')}>
@@ -169,7 +178,7 @@ export default function InventoryClient({
                 <th className="px-5 py-3 font-medium cursor-pointer select-none" style={{ color: 'var(--ink-soft)' }} onClick={() => toggleSort('quantity')}>
                   <span className="inline-flex items-center gap-1">Stock <ArrowUpDown size={12} /></span>
                 </th>
-                <th className="px-5 py-3 font-medium" style={{ color: 'var(--ink-soft)' }}></th>
+                <th className="px-5 py-3 font-medium text-right" style={{ color: 'var(--ink-soft)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -200,15 +209,31 @@ export default function InventoryClient({
                           {p.quantity}
                         </span>
                       </td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-5 py-3 text-right whitespace-nowrap">
                         {canEditProducts && (
-                          <button
-                            onClick={() => setRestockTarget(p)}
-                            className="text-xs font-medium flex items-center gap-1 ml-auto"
-                            style={{ color: 'var(--gold)' }}
-                          >
-                            <PackagePlus size={14} /> Restock
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setRestockTarget(p)}
+                              className="text-xs font-medium flex items-center gap-1"
+                              style={{ color: 'var(--gold)' }}
+                            >
+                              <PackagePlus size={14} /> Restock
+                            </button>
+                            <button
+                              onClick={() => setEditTarget(p)}
+                              className="p-1 rounded-md hover:bg-black/5"
+                              title="Edit product"
+                            >
+                              <Pencil size={14} color="var(--ink-soft)" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(p)}
+                              className="p-1 rounded-md hover:bg-black/5"
+                              title="Delete product"
+                            >
+                              <Trash2 size={14} color="var(--danger)" />
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -227,17 +252,17 @@ export default function InventoryClient({
             <h2 className="font-display font-semibold text-sm" style={{ color: 'var(--ink)' }}>Recent stock movements</h2>
           </div>
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-[700px] text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: 'var(--line)' }}>
-                {['Date', ...(isCeo ? ['Store'] : []), 'Product', 'Type', 'Change', 'Note', 'By'].map((h) => (
-                  <th key={h} className="px-5 py-3 font-medium" style={{ color: 'var(--ink-soft)' }}>{h}</th>
+                {['Date', ...(isCeo ? ['Store'] : []), 'Product', 'Type', 'Change', 'Note', 'By', ''].map((h, i) => (
+                  <th key={i} className="px-5 py-3 font-medium" style={{ color: 'var(--ink-soft)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {movements.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-8 text-center" style={{ color: 'var(--ink-soft)' }}>No stock movements yet.</td></tr>
+                <tr><td colSpan={isCeo ? 8 : 7} className="px-5 py-8 text-center" style={{ color: 'var(--ink-soft)' }}>No stock movements yet.</td></tr>
               ) : (
                 movements.map((m) => (
                   <tr key={m.id} className="border-b last:border-0" style={{ borderColor: 'var(--line)' }}>
@@ -250,6 +275,15 @@ export default function InventoryClient({
                     </td>
                     <td className="px-5 py-3" style={{ color: 'var(--ink-soft)' }}>{m.note ?? '—'}</td>
                     <td className="px-5 py-3" style={{ color: 'var(--ink-soft)' }}>{m.profiles?.full_name ?? '—'}</td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={() => handleDeleteMovement(m.id)}
+                        className="p-1 rounded-md hover:bg-black/5"
+                        title="Delete log"
+                      >
+                        <Trash2 size={14} color="var(--danger)" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -275,6 +309,20 @@ export default function InventoryClient({
           onSaved={() => { setRestockTarget(null); load() }}
         />
       )}
+      {editTarget && (
+        <EditProductModal
+          product={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => { setEditTarget(null); load() }}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteProductModal
+          product={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onSaved={() => { setDeleteTarget(null); load() }}
+        />
+      )}
     </div>
   )
 }
@@ -290,6 +338,129 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
         {children}
       </div>
     </div>
+  )
+}
+
+function EditProductModal({ product, onClose, onSaved }: { product: Product; onClose: () => void; onSaved: () => void }) {
+  const supabase = createClient()
+  const [form, setForm] = useState({
+    name: product.name || '',
+    sku: product.sku || '',
+    category: product.category || '',
+    size: product.size || '',
+    cost_price: String(product.cost_price ?? ''),
+    selling_price: String(product.selling_price ?? ''),
+    quantity: String(product.quantity ?? 0),
+    reorder_level: String(product.reorder_level ?? 5),
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    const oldQty = product.quantity
+    const newQty = Number(form.quantity) || 0
+    const qtyDiff = newQty - oldQty
+
+    const { error: updateErr } = await supabase.from('products').update({
+      name: form.name,
+      sku: form.sku || null,
+      category: form.category || null,
+      size: form.size || null,
+      cost_price: Number(form.cost_price) || 0,
+      selling_price: Number(form.selling_price) || 0,
+      quantity: newQty,
+      reorder_level: Number(form.reorder_level) || 5,
+    }).eq('id', product.id)
+
+    if (updateErr) {
+      setError(updateErr.message)
+      setSaving(false)
+      return
+    }
+
+    // If they changed the quantity manually, log it so the history reflects the change
+    if (qtyDiff !== 0) {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('inventory_movements').insert({
+        store_id: product.store_id,
+        product_id: product.id,
+        type: 'adjustment',
+        quantity: qtyDiff,
+        note: 'Manual edit via product update',
+        created_by: user?.id,
+      })
+    }
+
+    setSaving(false)
+    onSaved()
+  }
+
+  return (
+    <ModalShell title={`Edit — ${product.name}`} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <Field label="Product name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="SKU" value={form.sku} onChange={(v) => setForm({ ...form, sku: v })} />
+          <Field label="Category" value={form.category} onChange={(v) => setForm({ ...form, category: v })} placeholder="Foam, Spring…" />
+        </div>
+        <Field label="Size" value={form.size} onChange={(v) => setForm({ ...form, size: v })} placeholder="6x6, 4.5x6…" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Cost price (₦)" type="number" value={form.cost_price} onChange={(v) => setForm({ ...form, cost_price: v })} />
+          <Field label="Selling price (₦)" type="number" value={form.selling_price} onChange={(v) => setForm({ ...form, selling_price: v })} required />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Current stock" type="number" value={form.quantity} onChange={(v) => setForm({ ...form, quantity: v })} required />
+          <Field label="Reorder level" type="number" value={form.reorder_level} onChange={(v) => setForm({ ...form, reorder_level: v })} />
+        </div>
+        {error && (
+          <div className="text-sm rounded-lg px-3.5 py-2.5" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>{error}</div>
+        )}
+        <button disabled={saving} type="submit" className="w-full mt-2 rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-60" style={{ background: 'var(--ink)' }}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </form>
+    </ModalShell>
+  )
+}
+
+function DeleteProductModal({ product, onClose, onSaved }: { product: Product; onClose: () => void; onSaved: () => void }) {
+  const supabase = createClient()
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleDelete() {
+    setSaving(true)
+    setError(null)
+    const { error } = await supabase.from('products').delete().eq('id', product.id)
+    setSaving(false)
+    if (error) {
+      setError(error.message)
+      return
+    }
+    onSaved()
+  }
+
+  return (
+    <ModalShell title={`Delete ${product.name}?`} onClose={onClose}>
+      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
+        This permanently deletes this product and all its stock movement history. This cannot be undone.
+      </p>
+      {error && (
+        <div className="text-sm rounded-lg px-3.5 py-2.5 mb-4" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>{error}</div>
+      )}
+      <button
+        disabled={saving}
+        onClick={handleDelete}
+        className="w-full rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-40"
+        style={{ background: 'var(--danger)' }}
+      >
+        {saving ? 'Deleting…' : 'Delete product permanently'}
+      </button>
+    </ModalShell>
   )
 }
 
