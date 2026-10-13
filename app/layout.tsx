@@ -7,8 +7,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jbmono", weight: ["400", "500"] });
 
 export const metadata: Metadata = {
-  title: "Amina Abubakar Mattress Stores",
-  description: "Sales, inventory and staff management",
+  title: "Naanah Amins Ventures",
+  description: "Sales, inventory and staff management for Naanah Amins Ventures",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
