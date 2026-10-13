@@ -275,13 +275,12 @@ function EditSaleModal({ sale, onClose, onSaved }: { sale: SaleRow; onClose: () 
   const supabase = createClient()
   const [customerName, setCustomerName] = useState(sale.customer_name || '')
   const [customerPhone, setCustomerPhone] = useState(sale.customer_phone || '')
-  const [paymentMethod, setPaymentMethod] = useState(sale.payment_method)
+  // FIX: Added <string> to useState to fix the Vercel TypeScript build error
+  const [paymentMethod, setPaymentMethod] = useState<string>(sale.payment_method || 'cash')
   const [totalAmount, setTotalAmount] = useState(String(sale.total_amount))
   const [amountPaid, setAmountPaid] = useState(String(sale.amount_paid))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const naira = (n: number) => `₦${Number(n).toLocaleString('en-NG')}`
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
