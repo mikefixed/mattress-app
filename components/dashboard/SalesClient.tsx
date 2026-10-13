@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/ui/PageHeader'
 import type { Product, Role, Sale } from '@/lib/types'
-import { Plus, X, Trash2, Search, Download } from 'lucide-react'
+import { Plus, X, Trash2, Search, Download, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 
 type CartLine = { product: Product; quantity: number }
@@ -28,6 +28,8 @@ export default function SalesClient({
   const [sales, setSales] = useState<SaleRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
+  const [editTarget, setEditTarget] = useState<SaleRow | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<SaleRow | null>(null)
 
   // filters
   const [search, setSearch] = useState('')
@@ -167,7 +169,7 @@ export default function SalesClient({
       <div className="px-4 sm:px-8 pb-8">
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: 'var(--line)' }}>
                 <th className="px-5 py-3 font-medium cursor-pointer select-none" style={{ color: 'var(--ink-soft)' }} onClick={() => toggleSort('created_at')}>
@@ -180,13 +182,14 @@ export default function SalesClient({
                 <th className="px-5 py-3 font-medium cursor-pointer select-none" style={{ color: 'var(--ink-soft)' }} onClick={() => toggleSort('total_amount')}>
                   Total {sortBy === 'total_amount' && (sortDir === 'asc' ? '↑' : '↓')}
                 </th>
+                <th className="px-5 py-3 font-medium text-right" style={{ color: 'var(--ink-soft)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center" style={{ color: 'var(--ink-soft)' }}>Loading…</td></tr>
+                <tr><td colSpan={isCeo ? 7 : 6} className="px-5 py-10 text-center" style={{ color: 'var(--ink-soft)' }}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center" style={{ color: 'var(--ink-soft)' }}>No sales match these filters.</td></tr>
+                <tr><td colSpan={isCeo ? 7 : 6} className="px-5 py-10 text-center" style={{ color: 'var(--ink-soft)' }}>No sales match these filters.</td></tr>
               ) : (
                 filtered.map((s) => {
                   const balance = Number(s.total_amount) - Number(s.amount_paid)
@@ -206,6 +209,16 @@ export default function SalesClient({
                         </span>
                       </td>
                       <td className="px-5 py-3 font-mono-num font-medium" style={{ color: 'var(--ink)' }}>{naira(s.total_amount)}</td>
+                      <td className="px-5 py-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => setEditTarget(s)} className="p-1 rounded-md hover:bg-black/5" title="Edit sale">
+                            <Pencil size={14} color="var(--ink-soft)" />
+                          </button>
+                          <button onClick={() => setDeleteTarget(s)} className="p-1 rounded-md hover:bg-black/5" title="Delete sale">
+                            <Trash2 size={14} color="var(--danger)" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   )
                 })
@@ -226,7 +239,147 @@ export default function SalesClient({
           onSaved={() => { setShowNew(false); load() }}
         />
       )}
+      {editTarget && (
+        <EditSaleModal
+          sale={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => { setEditTarget(null); load() }}
+        />
+      )}
+      {deleteTarget && (
+        <DeleteSaleModal
+          sale={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onSaved={() => { setDeleteTarget(null); load() }}
+        />
+      )}
     </div>
+  )
+}
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+      <div className="w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)' }}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-display font-semibold text-lg" style={{ color: 'var(--ink)' }}>{title}</h3>
+          <button onClick={onClose}><X size={18} color="var(--ink-soft)" /></button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function EditSaleModal({ sale, onClose, onSaved }: { sale: SaleRow; onClose: () => void; onSaved: () => void }) {
+  const supabase = createClient()
+  const [customerName, setCustomerName] = useState(sale.customer_name || '')
+  const [customerPhone, setCustomerPhone] = useState(sale.customer_phone || '')
+  const [paymentMethod, setPaymentMethod] = useState(sale.payment_method)
+  const [totalAmount, setTotalAmount] = useState(String(sale.total_amount))
+  const [amountPaid, setAmountPaid] = useState(String(sale.amount_paid))
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const naira = (n: number) => `₦${Number(n).toLocaleString('en-NG')}`
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    const { error } = await supabase.from('sales').update({
+      customer_name: customerName || null,
+      customer_phone: customerPhone || null,
+      payment_method: paymentMethod,
+      total_amount: Number(totalAmount) || 0,
+      amount_paid: Number(amountPaid) || 0,
+    }).eq('id', sale.id)
+
+    setSaving(false)
+    if (error) { setError(error.message); return }
+    onSaved()
+  }
+
+  return (
+    <ModalShell title={`Edit Sale — ${format(new Date(sale.created_at), 'd MMM, h:mm a')}`} onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-soft)' }}>Customer name</label>
+          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)' }} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-soft)' }}>Customer phone</label>
+          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)' }} />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-soft)' }}>Payment method</label>
+          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)' }}>
+            <option value="cash">Cash</option>
+            <option value="transfer">Bank transfer</option>
+            <option value="pos">POS</option>
+            <option value="credit">Credit (pay later)</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-soft)' }}>Total Amount (₦)</label>
+            <input type="number" required value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)' }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-soft)' }}>Amount Paid (₦)</label>
+            <input type="number" required value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)' }} />
+          </div>
+        </div>
+        {error && (
+          <div className="text-sm rounded-lg px-3.5 py-2.5" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>{error}</div>
+        )}
+        <button disabled={saving} type="submit" className="w-full mt-2 rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-60" style={{ background: 'var(--ink)' }}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </form>
+    </ModalShell>
+  )
+}
+
+function DeleteSaleModal({ sale, onClose, onSaved }: { sale: SaleRow; onClose: () => void; onSaved: () => void }) {
+  const supabase = createClient()
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleDelete() {
+    setDeleting(true)
+    setError(null)
+    const { error } = await supabase.from('sales').delete().eq('id', sale.id)
+    setDeleting(false)
+    if (error) { setError(error.message); return }
+    onSaved()
+  }
+
+  return (
+    <ModalShell title="Delete Sale?" onClose={onClose}>
+      <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
+        This will permanently delete this sales record. 
+        <br/><br/>
+        <span className="font-medium" style={{ color: 'var(--danger)' }}>Note:</span> Deleting this sale does NOT automatically return the sold items to your inventory. You may need to manually restock the items from the Inventory page.
+      </p>
+      {error && (
+        <div className="text-sm rounded-lg px-3.5 py-2.5 mb-4" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>{error}</div>
+      )}
+      <button
+        disabled={deleting}
+        onClick={handleDelete}
+        className="w-full rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-40"
+        style={{ background: 'var(--danger)' }}
+      >
+        {deleting ? 'Deleting…' : 'Delete sale permanently'}
+      </button>
+    </ModalShell>
   )
 }
 
