@@ -142,9 +142,10 @@ export default function Sidebar({ role, fullName }: { role: Role; fullName: stri
         
         {/* Address and Contact Info */}
         <div className="px-5 py-3 border-b border-white/10 text-xs text-white/60 leading-relaxed">
-          <p>No 3 Ahmadu Bello Way</p>
-          <p>Kaduna</p>
-          <p className="mt-1 text-white/80">090876543298</p>
+          <p>No 30, Nnamdi Azikiwe Bypass</p>
+          <p>Kurmin Mashi, Kaduna</p>
+          <p className="mt-1 text-white/80">09121212766, 08061677979</p>
+          <p className="mt-1 text-white/80">naanahaminsventures@gmail.com</p>
         </div>
 
         <NavLinks />
