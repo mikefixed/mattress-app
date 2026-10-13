@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image' // Added for the logo
+import Image from 'next/image'
 import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
@@ -46,10 +46,6 @@ export default function LoginPage() {
       setError(error.message)
       return
     }
-    // If email confirmation is off, signUp returns an active session immediately,
-    // which lets this insert succeed under RLS (id = auth.uid()). If confirmation
-    // is required, this will simply be skipped — the CEO can add the profile from
-    // the Staff page (or the seed SQL) once the user confirms and signs in.
     if (data.user && data.session) {
       await supabase.from('profiles').insert({
         id: data.user.id,
@@ -64,6 +60,25 @@ export default function LoginPage() {
       setNotice(
         'Account created. Ask your CEO to assign your role and store from the Staff page before you can access the dashboard.'
       )
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setError('Please enter your email address above first, then click "Forgot password?".')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    setNotice(null)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    })
+    setLoading(false)
+    if (error) {
+      setError(error.message)
+    } else {
+      setNotice('Password reset link sent! Check your email inbox.')
     }
   }
 
@@ -190,6 +205,17 @@ export default function LoginPage() {
               {mode === 'signin' ? 'Sign in' : 'Create account'}
             </button>
           </form>
+
+          {mode === 'signin' && (
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              className="mt-4 text-sm w-full text-center hover:underline"
+              style={{ color: 'var(--ink-soft)' }}
+            >
+              Forgot password?
+            </button>
+          )}
 
           <button
             onClick={() => {
