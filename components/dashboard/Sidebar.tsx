@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image' // Added for the logo
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -11,7 +12,6 @@ import {
   Users,
   Store,
   LogOut,
-  BedDouble,
   Menu,
   X,
   HandCoins,
@@ -82,6 +82,19 @@ export default function Sidebar({ role, fullName }: { role: Role; fullName: stri
     </div>
   )
 
+  // A reusable Logo component to keep the code clean
+  const Logo = ({ size = 32 }: { size?: number }) => (
+    <div className="rounded-lg overflow-hidden shrink-0" style={{ width: size, height: size, background: 'var(--gold)' }}>
+      <Image 
+        src="/logo.png" 
+        alt="Naanah Amins Ventures Logo" 
+        width={size} 
+        height={size} 
+        className="object-cover w-full h-full"
+      />
+    </div>
+  )
+
   return (
     <>
       {/* Mobile top bar */}
@@ -90,10 +103,8 @@ export default function Sidebar({ role, fullName }: { role: Role; fullName: stri
         style={{ background: 'var(--ink)' }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--gold)' }}>
-            <BedDouble size={15} color="var(--ink)" />
-          </div>
-          <span className="font-display text-sm font-semibold truncate">Amina Abubakar Stores</span>
+          <Logo size={28} />
+          <span className="font-display text-sm font-semibold truncate">Naanah Amins Ventures</span>
         </div>
         <button onClick={() => setOpen(true)} aria-label="Open menu" className="p-1.5 -mr-1.5">
           <Menu size={22} />
@@ -123,13 +134,19 @@ export default function Sidebar({ role, fullName }: { role: Role; fullName: stri
         style={{ background: 'var(--ink)' }}
       >
         <div className="flex items-center gap-2.5 px-5 h-16 border-b border-white/10">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--gold)' }}>
-            <BedDouble size={16} color="var(--ink)" />
-          </div>
+          <Logo size={32} />
           <span className="font-display text-sm font-semibold leading-tight">
-            Amina Abubakar<br />Mattress Stores
+            Naanah Amins<br />Ventures
           </span>
         </div>
+        
+        {/* Address and Contact Info */}
+        <div className="px-5 py-3 border-b border-white/10 text-xs text-white/60 leading-relaxed">
+          <p>No 3 Ahmadu Bello Way</p>
+          <p>Kaduna</p>
+          <p className="mt-1 text-white/80">090876543298</p>
+        </div>
+
         <NavLinks />
         <AccountFooter />
       </aside>
