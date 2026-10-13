@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { BedDouble, Loader2 } from 'lucide-react'
+import Image from 'next/image' // Added for the logo
+import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -66,15 +67,26 @@ export default function LoginPage() {
     }
   }
 
+  // Reusable Logo component for this page
+  const Logo = ({ size = 40 }: { size?: number }) => (
+    <div className="rounded-lg overflow-hidden shrink-0" style={{ width: size, height: size, background: 'var(--gold)' }}>
+      <Image 
+        src="/logo.png" 
+        alt="Naanah Amins Ventures Logo" 
+        width={size} 
+        height={size} 
+        className="object-cover w-full h-full"
+      />
+    </div>
+  )
+
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Brand panel */}
       <div className="tick-stripes hidden lg:flex flex-col justify-between p-12 text-white" style={{ background: 'var(--ink)' }}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'var(--gold)' }}>
-            <BedDouble size={22} color="var(--ink)" />
-          </div>
-          <span className="font-display text-lg font-semibold">Amina Abubakar Mattress Stores</span>
+          <Logo size={40} />
+          <span className="font-display text-lg font-semibold">Naanah Amins Ventures</span>
         </div>
 
         <div className="max-w-md">
@@ -96,11 +108,9 @@ export default function LoginPage() {
       <div className="flex items-center justify-center p-6 sm:p-8" style={{ background: 'var(--paper)' }}>
         <div className="w-full max-w-sm">
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--gold)' }}>
-              <BedDouble size={18} color="var(--ink)" />
-            </div>
+            <Logo size={32} />
             <span className="font-display font-semibold" style={{ color: 'var(--ink)' }}>
-              Amina Abubakar Mattress Stores
+              Naanah Amins Ventures
             </span>
           </div>
 
@@ -140,7 +150,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none focus:ring-2"
                 style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}
-                placeholder="you@aminaabubakar.com"
+                placeholder="you@naanahaminsventures.com"
               />
             </div>
             <div>
