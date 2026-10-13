@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/ui/PageHeader'
 import type { Profile } from '@/lib/types'
-import { ShieldCheck, ShieldOff, Search } from 'lucide-react'
+import { ShieldCheck, ShieldOff, Search, Trash2, X } from 'lucide-react'
 
 export default function StaffClient({
   isCeo,
@@ -24,6 +24,7 @@ export default function StaffClient({
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
 
   async function updateProfile(id: string, patch: Partial<Profile>) {
     setSaving(id)
@@ -147,16 +148,25 @@ export default function StaffClient({
                     </td>
                     <td className="px-5 py-3">
                       {isCeo && p.id !== currentUserId && (
-                        <button
-                          disabled={saving === p.id || (!p.is_active && !p.store_id && p.role !== 'ceo')}
-                          onClick={() => updateProfile(p.id, { is_active: !p.is_active })}
-                          className="flex items-center gap-1.5 text-xs font-medium disabled:opacity-40"
-                          style={{ color: p.is_active ? 'var(--danger)' : 'var(--success)' }}
-                          title={!p.is_active && !p.store_id && p.role !== 'ceo' ? 'Assign a store first' : ''}
-                        >
-                          {p.is_active ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
-                          {p.is_active ? 'Deactivate' : 'Activate'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            disabled={saving === p.id || (!p.is_active && !p.store_id && p.role !== 'ceo')}
+                            onClick={() => updateProfile(p.id, { is_active: !p.is_active })}
+                            className="flex items-center gap-1.5 text-xs font-medium disabled:opacity-40"
+                            style={{ color: p.is_active ? 'var(--danger)' : 'var(--success)' }}
+                            title={!p.is_active && !p.store_id && p.role !== 'ceo' ? 'Assign a store first' : ''}
+                          >
+                            {p.is_active ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
+                            {p.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(p)}
+                            className="p-1 rounded-md hover:bg-black/5"
+                            title="Delete staff"
+                          >
+                            <Trash2 size={14} color="var(--danger)" />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -166,6 +176,56 @@ export default function StaffClient({
           </table>
           </div>
         </div>
+      </div>
+
+      {deleteTarget && (
+        <DeleteStaffModal
+          staff={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onSaved={() => { setDeleteTarget(null); router.refresh() }}
+        />
+      )}
+    </div>
+  )
+}
+
+function DeleteStaffModal({ staff, onClose, onSaved }: { staff: Profile; onClose: () => void; onSaved: () => void }) {
+  const supabase = createClient()
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleDelete() {
+    setDeleting(true)
+    setError(null)
+    const { error } = await supabase.from('profiles').delete().eq('id', staff.id)
+    setDeleting(false)
+    if (error) { setError(error.message); return }
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+      <div className="w-full max-w-sm rounded-xl p-6" style={{ background: 'var(--surface)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display font-semibold text-lg" style={{ color: 'var(--danger)' }}>Delete {staff.full_name}?</h3>
+          <button onClick={onClose}><X size={18} color="var(--ink-soft)" /></button>
+        </div>
+        <p className="text-sm mb-4" style={{ color: 'var(--ink-soft)' }}>
+          This will permanently delete this staff member's profile. They will no longer be able to log in.
+          <br/><br/>
+          <span className="font-medium" style={{ color: 'var(--danger)' }}>Note:</span> If this staff member has recorded sales or inventory movements, Supabase may block this deletion to protect your historical data.
+        </p>
+        {error && (
+          <div className="text-sm rounded-lg px-3.5 py-2.5 mb-4" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>{error}</div>
+        )}
+        <button
+          disabled={deleting}
+          onClick={handleDelete}
+          className="w-full rounded-lg py-2.5 text-sm font-medium text-white disabled:opacity-40"
+          style={{ background: 'var(--danger)' }}
+        >
+          {deleting ? 'Deleting…' : 'Delete staff permanently'}
+        </button>
       </div>
     </div>
   )
