@@ -9,11 +9,13 @@ import { ShieldCheck, ShieldOff, Search, Trash2, X } from 'lucide-react'
 
 export default function StaffClient({
   isCeo,
+  canManage,
   staff,
   stores,
   currentUserId,
 }: {
   isCeo: boolean
+  canManage: boolean
   staff: Profile[]
   stores: { id: string; name: string }[]
   currentUserId: string
@@ -35,6 +37,11 @@ export default function StaffClient({
 
   const storeName = (id: string | null) => stores.find((s) => s.id === id)?.name ?? '—'
 
+  // CEO or manager can edit a row, but never their own row,
+  // and only the CEO can edit CEO accounts.
+  const canEditRow = (p: Profile) =>
+    canManage && p.id !== currentUserId && (isCeo || p.role !== 'ceo')
+
   const filtered = useMemo(() => {
     return staff.filter((p) => {
       if (search && !p.full_name.toLowerCase().includes(search.toLowerCase())) return false
@@ -50,7 +57,7 @@ export default function StaffClient({
       <PageHeader
         title="Staff"
         subtitle={
-          isCeo
+          canManage
             ? 'Activate accounts, assign roles and stores, and manage access.'
             : 'Staff at your store.'
         }
@@ -88,7 +95,7 @@ export default function StaffClient({
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="text-left border-b" style={{ borderColor: 'var(--line)' }}>
-                {['Name', 'Role', 'Store', 'Status', isCeo ? 'Actions' : ''].map((h) => (
+                {['Name', 'Role', 'Store', 'Status', canManage ? 'Actions' : ''].map((h) => (
                   <th key={h} className="px-5 py-3 font-medium" style={{ color: 'var(--ink-soft)' }}>{h}</th>
                 ))}
               </tr>
@@ -105,7 +112,7 @@ export default function StaffClient({
                       </p>
                     </td>
                     <td className="px-5 py-3">
-                      {isCeo && p.id !== currentUserId ? (
+                      {canEditRow(p) ? (
                         <select
                           value={p.role}
                           onChange={(e) => updateProfile(p.id, { role: e.target.value as Profile['role'] })}
@@ -114,14 +121,14 @@ export default function StaffClient({
                         >
                           <option value="staff">staff</option>
                           <option value="manager">manager</option>
-                          <option value="ceo">ceo</option>
+                          {isCeo && <option value="ceo">ceo</option>}
                         </select>
                       ) : (
                         <span className="text-xs uppercase font-medium" style={{ color: 'var(--gold)' }}>{p.role}</span>
                       )}
                     </td>
                     <td className="px-5 py-3">
-                      {isCeo && p.id !== currentUserId && p.role !== 'ceo' ? (
+                      {canEditRow(p) && p.role !== 'ceo' ? (
                         <select
                           value={p.store_id ?? ''}
                           onChange={(e) => updateProfile(p.id, { store_id: e.target.value || null })}
@@ -147,7 +154,7 @@ export default function StaffClient({
                       </span>
                     </td>
                     <td className="px-5 py-3">
-                      {isCeo && p.id !== currentUserId && (
+                      {canEditRow(p) && (
                         <div className="flex items-center gap-3">
                           <button
                             disabled={saving === p.id || (!p.is_active && !p.store_id && p.role !== 'ceo')}
