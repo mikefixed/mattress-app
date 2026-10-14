@@ -24,7 +24,7 @@ const NAV = [
   { href: '/dashboard/inventory', label: 'Inventory', icon: Package, roles: ['ceo', 'manager', 'staff'] },
   { href: '/dashboard/debtors', label: 'Debtors', icon: HandCoins, roles: ['ceo', 'manager'] },
   { href: '/dashboard/staff', label: 'Staff', icon: Users, roles: ['ceo', 'manager'] },
-  { href: '/dashboard/stores', label: 'Stores', icon: Store, roles: ['ceo'] },
+  { href: '/dashboard/stores', label: 'Stores', icon: Store, roles: ['ceo', 'manager'] },
 ]
 
 export default function Sidebar({ role, fullName }: { role: Role; fullName: string }) {
