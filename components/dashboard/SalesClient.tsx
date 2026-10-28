@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/ui/PageHeader'
 import type { Product, Role, Sale } from '@/lib/types'
-import { Plus, X, Trash2, Search, Download, Pencil } from 'lucide-react'
+import { Plus, X, Trash2, Search, Download, Pencil, Printer } from 'lucide-react'
 import { format } from 'date-fns'
+import { createPortal } from 'react-dom'
 
 type CartLine = { product: Product; quantity: number }
 type SaleRow = Sale & { profiles?: { full_name: string }; stores?: { name: string } }
@@ -30,6 +31,7 @@ export default function SalesClient({
   const [showNew, setShowNew] = useState(false)
   const [editTarget, setEditTarget] = useState<SaleRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<SaleRow | null>(null)
+  const [receiptId, setReceiptId] = useState<string | null>(null)
 
   // filters
   const [search, setSearch] = useState('')
@@ -211,6 +213,9 @@ export default function SalesClient({
                       <td className="px-5 py-3 font-mono-num font-medium" style={{ color: 'var(--ink)' }}>{naira(s.total_amount)}</td>
                       <td className="px-5 py-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => setReceiptId(s.id)} className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-black/5 text-xs font-medium" style={{ color: 'var(--ink)' }} title="View / print receipt">
+                            <Printer size={14} color="var(--ink-soft)" /> Receipt
+                          </button>
                           <button onClick={() => setEditTarget(s)} className="p-1 rounded-md hover:bg-black/5" title="Edit sale">
                             <Pencil size={14} color="var(--ink-soft)" />
                           </button>
@@ -236,7 +241,7 @@ export default function SalesClient({
           stores={stores}
           soldBy={myId}
           onClose={() => setShowNew(false)}
-          onSaved={() => { setShowNew(false); load() }}
+          onSaved={(saleId) => { setShowNew(false); load(); setReceiptId(saleId) }}
         />
       )}
       {editTarget && (
@@ -252,6 +257,9 @@ export default function SalesClient({
           onClose={() => setDeleteTarget(null)}
           onSaved={() => { setDeleteTarget(null); load() }}
         />
+      )}
+      {receiptId && (
+        <ReceiptModal saleId={receiptId} onClose={() => setReceiptId(null)} />
       )}
     </div>
   )
@@ -384,7 +392,7 @@ function DeleteSaleModal({ sale, onClose, onSaved }: { sale: SaleRow; onClose: (
 
 function NewSaleModal({ isCeo, defaultStoreId, stores, soldBy, onClose, onSaved }: {
   isCeo: boolean; defaultStoreId: string | null; stores: { id: string; name: string }[]
-  soldBy: string; onClose: () => void; onSaved: () => void
+  soldBy: string; onClose: () => void; onSaved: (saleId: string) => void
 }) {
   const supabase = createClient()
   const [saleStoreId, setSaleStoreId] = useState<string>(defaultStoreId ?? '')
@@ -480,7 +488,7 @@ function NewSaleModal({ isCeo, defaultStoreId, stores, soldBy, onClose, onSaved 
     }
 
     setSaving(false)
-    onSaved()
+    onSaved(sale.id)
   }
 
   const naira = (n: number) => `₦${Number(n).toLocaleString('en-NG')}`
@@ -592,5 +600,196 @@ function NewSaleModal({ isCeo, defaultStoreId, stores, soldBy, onClose, onSaved 
         </button>
       </div>
     </div>
+  )
+}
+
+// ───────────────────────── Receipt ─────────────────────────
+// Business details shown at the top of every receipt. Edit these lines to change them.
+const BUSINESS = {
+  name: 'Naanah Amins Ventures',
+  address: ['No 30, Nnamdi Azikiwe Bypass', 'Kurmin Mashi, Kaduna'],
+  phones: '09121212766, 08061677979',
+  email: 'naanahaminsventures@gmail.com',
+}
+
+type ReceiptItem = {
+  quantity: number
+  unit_price: number
+  subtotal: number
+  products: { name: string; sku: string | null; size: string | null } | null
+}
+
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  transfer: 'Bank transfer',
+  pos: 'POS',
+  credit: 'Credit (pay later)',
+}
+
+function ReceiptModal({ saleId, onClose }: { saleId: string; onClose: () => void }) {
+  const [supabase] = useState(() => createClient())
+  const [mounted, setMounted] = useState(false)
+  const [sale, setSale] = useState<SaleRow | null>(null)
+  const [items, setItems] = useState<ReceiptItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [itemsError, setItemsError] = useState<string | null>(null)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      const { data: s, error: saleErr } = await supabase
+        .from('sales')
+        .select('*, profiles:sold_by(full_name), stores:store_id(name)')
+        .eq('id', saleId)
+        .single()
+      const { data: it, error: itemsErr } = await supabase
+        .from('sale_items')
+        .select('quantity, unit_price, subtotal, products(name, sku, size)')
+        .eq('sale_id', saleId)
+      if (cancelled) return
+      if (saleErr || !s) {
+        setError(saleErr?.message ?? 'Could not load this sale.')
+        setLoading(false)
+        return
+      }
+      setSale(s as unknown as SaleRow)
+      if (itemsErr) setItemsError(itemsErr.message)
+      setItems((it as unknown as ReceiptItem[]) ?? [])
+      setLoading(false)
+    }
+    run()
+    return () => { cancelled = true }
+  }, [saleId, supabase])
+
+  const money = (n: number) =>
+    `₦${Number(n).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  if (!mounted) return null
+
+  const total = sale ? Number(sale.total_amount) : 0
+  const paid = sale ? Number(sale.amount_paid) : 0
+  const balance = total - paid
+  const receiptNo = sale
+    ? `RCT-${format(new Date(sale.created_at), 'yyMMdd')}-${sale.id.slice(0, 6).toUpperCase()}`
+    : ''
+
+  const printCss = `
+    @media print {
+      body > *:not(#receipt-root) { display: none !important; }
+      #receipt-root { position: static !important; background: none !important; overflow: visible !important; padding: 0 !important; }
+      .no-print { display: none !important; }
+      .receipt-sheet { border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; max-width: none !important; }
+    }
+    @page { margin: 8mm; }
+  `
+
+  return createPortal(
+    <div id="receipt-root" className="fixed inset-0 z-[60] bg-black/40 overflow-y-auto p-4">
+      <style>{printCss}</style>
+      <div className="mx-auto w-full max-w-sm">
+        <div className="no-print flex items-center justify-between mb-3">
+          <button
+            onClick={() => window.print()}
+            disabled={loading || !sale}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: 'var(--ink)' }}
+          >
+            <Printer size={16} /> Print / Save as PDF
+          </button>
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-sm font-medium bg-white"
+            style={{ color: '#111' }}
+          >
+            <X size={16} /> Close
+          </button>
+        </div>
+
+        <div className="receipt-sheet rounded-xl p-5 text-sm" style={{ background: '#fff', color: '#111' }}>
+          {loading ? (
+            <p className="py-10 text-center" style={{ color: '#555' }}>Loading receipt…</p>
+          ) : error || !sale ? (
+            <p className="py-10 text-center" style={{ color: '#b00020' }}>{error ?? 'Could not load this sale.'}</p>
+          ) : (
+            <>
+              <div className="text-center mb-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo.png" alt="" width={44} height={44} style={{ margin: '0 auto 6px', borderRadius: 8 }} />
+                <p style={{ fontWeight: 700, fontSize: 16 }}>{BUSINESS.name}</p>
+                {BUSINESS.address.map((l) => <p key={l} style={{ fontSize: 12, color: '#444' }}>{l}</p>)}
+                <p style={{ fontSize: 12, color: '#444' }}>{BUSINESS.phones}</p>
+                <p style={{ fontSize: 12, color: '#444' }}>{BUSINESS.email}</p>
+              </div>
+
+              <div style={{ borderTop: '1px dashed #999', borderBottom: '1px dashed #999', padding: '8px 0', fontSize: 12 }}>
+                <p style={{ textAlign: 'center', fontWeight: 700, letterSpacing: 1 }}>SALES RECEIPT</p>
+                <div className="flex justify-between"><span>Receipt no.</span><span>{receiptNo}</span></div>
+                <div className="flex justify-between"><span>Date</span><span>{format(new Date(sale.created_at), 'd MMM yyyy, h:mm a')}</span></div>
+                <div className="flex justify-between"><span>Store</span><span>{sale.stores?.name ?? '—'}</span></div>
+                <div className="flex justify-between"><span>Served by</span><span>{sale.profiles?.full_name ?? '—'}</span></div>
+                <div className="flex justify-between"><span>Customer</span><span>{sale.customer_name || 'Walk-in customer'}</span></div>
+                {sale.customer_phone && (
+                  <div className="flex justify-between"><span>Phone</span><span>{sale.customer_phone}</span></div>
+                )}
+              </div>
+
+              <table className="w-full mt-3" style={{ fontSize: 12 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>
+                    <th style={{ paddingBottom: 4 }}>Item</th>
+                    <th style={{ paddingBottom: 4, textAlign: 'center' }}>Qty</th>
+                    <th style={{ paddingBottom: 4, textAlign: 'right' }}>Price</th>
+                    <th style={{ paddingBottom: 4, textAlign: 'right' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '8px 0', color: '#555' }}>
+                        {itemsError ? `Item details unavailable: ${itemsError}` : 'No item details were saved for this sale.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((i, idx) => {
+                      const p = i.products
+                      const label = p ? (p.sku || [p.name, p.size].filter(Boolean).join(' ')) : 'Item no longer in stock list'
+                      return (
+                        <tr key={idx} style={{ verticalAlign: 'top', borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '4px 4px 4px 0' }}>{label}</td>
+                          <td style={{ padding: '4px 0', textAlign: 'center' }}>{i.quantity}</td>
+                          <td style={{ padding: '4px 0', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(i.unit_price)}</td>
+                          <td style={{ padding: '4px 0', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(i.subtotal)}</td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+
+              <div style={{ borderTop: '1px dashed #999', marginTop: 8, paddingTop: 8, fontSize: 12 }}>
+                <div className="flex justify-between" style={{ fontSize: 15, fontWeight: 700 }}>
+                  <span>TOTAL</span><span>{money(total)}</span>
+                </div>
+                <div className="flex justify-between mt-1"><span>Payment method</span><span>{PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method}</span></div>
+                <div className="flex justify-between"><span>Amount paid</span><span>{money(paid)}</span></div>
+                {balance > 0 ? (
+                  <div className="flex justify-between" style={{ fontWeight: 700, color: '#b00020' }}>
+                    <span>Balance owed</span><span>{money(balance)}</span>
+                  </div>
+                ) : (
+                  <p style={{ textAlign: 'right', fontWeight: 700, marginTop: 2 }}>PAID IN FULL</p>
+                )}
+              </div>
+
+              <p style={{ textAlign: 'center', marginTop: 14, fontSize: 12 }}>Thank you for your patronage!</p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
