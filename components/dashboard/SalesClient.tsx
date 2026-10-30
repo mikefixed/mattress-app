@@ -9,7 +9,7 @@ import { format } from 'date-fns'
 import { createPortal } from 'react-dom'
 
 type CartLine = { product: Product; quantity: number }
-type SaleRow = Sale & { profiles?: { full_name: string }; stores?: { name: string } }
+type SaleRow = Sale & { discount_percent?: number | null; profiles?: { full_name: string }; stores?: { name: string } }
 
 export default function SalesClient({
   role,
@@ -80,7 +80,7 @@ export default function SalesClient({
   }
 
   function exportCsv() {
-    const header = ['Date', 'Store', 'Customer', 'Phone', 'Sold by', 'Payment', 'Total', 'Paid', 'Balance']
+    const header = ['Date', 'Store', 'Customer', 'Phone', 'Sold by', 'Payment', 'Total', 'Discount %', 'Paid', 'Balance']
     const rows = filtered.map((s) => [
       format(new Date(s.created_at), 'yyyy-MM-dd HH:mm'),
       s.stores?.name ?? '',
@@ -89,6 +89,7 @@ export default function SalesClient({
       s.profiles?.full_name ?? '',
       s.payment_method,
       s.total_amount,
+      Number(s.discount_percent) || 0,
       s.amount_paid,
       Number(s.total_amount) - Number(s.amount_paid),
     ])
@@ -210,7 +211,11 @@ export default function SalesClient({
                           {s.payment_method}{s.payment_method === 'credit' && balance > 0 ? ` · ${naira(balance)} owed` : ''}
                         </span>
                       </td>
-                      <td className="px-5 py-3 font-mono-num font-medium" style={{ color: 'var(--ink)' }}>{naira(s.total_amount)}</td>
+                      <td className="px-5 py-3 font-mono-num font-medium" style={{ color: 'var(--ink)' }}>{naira(s.total_amount)}{Number(s.discount_percent) > 0 && (
+                        <span className="ml-2 text-xs font-medium px-1.5 py-0.5 rounded-md" style={{ background: 'var(--gold-soft)', color: 'var(--ink)' }}>
+                          −{Number(s.discount_percent)}%
+                        </span>
+                      )}</td>
                       <td className="px-5 py-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={() => setReceiptId(s.id)} className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-black/5 text-xs font-medium" style={{ color: 'var(--ink)' }} title="View / print receipt">
@@ -287,6 +292,26 @@ function EditSaleModal({ sale, onClose, onSaved }: { sale: SaleRow; onClose: () 
   const [paymentMethod, setPaymentMethod] = useState<string>(sale.payment_method || 'cash')
   const [totalAmount, setTotalAmount] = useState(String(sale.total_amount))
   const [amountPaid, setAmountPaid] = useState(String(sale.amount_paid))
+  const [discount, setDiscount] = useState(String(Number(sale.discount_percent) || 0))
+  const [itemsSubtotal, setItemsSubtotal] = useState(0)
+
+  useEffect(() => {
+    supabase.from('sale_items').select('subtotal').eq('sale_id', sale.id).then(({ data }) => {
+      const rows = (data as { subtotal: number }[] | null) ?? []
+      setItemsSubtotal(rows.reduce((sum, r) => sum + Number(r.subtotal), 0))
+    })
+  }, [sale.id, supabase])
+
+  // Changing the discount recalculates the total from the items on this sale
+  function changeDiscount(value: string) {
+    setDiscount(value)
+    const pct = Math.min(100, Math.max(0, Number(value) || 0))
+    if (itemsSubtotal > 0) {
+      const newTotal = Math.round(itemsSubtotal * (100 - pct)) / 100
+      setTotalAmount(String(newTotal))
+      if (paymentMethod !== 'credit') setAmountPaid(String(newTotal))
+    }
+  }
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -301,6 +326,9 @@ function EditSaleModal({ sale, onClose, onSaved }: { sale: SaleRow; onClose: () 
       payment_method: paymentMethod,
       total_amount: Number(totalAmount) || 0,
       amount_paid: Number(amountPaid) || 0,
+      ...(Math.min(100, Math.max(0, Number(discount) || 0)) !== (Number(sale.discount_percent) || 0)
+        ? { discount_percent: Math.min(100, Math.max(0, Number(discount) || 0)) }
+        : {}),
     }).eq('id', sale.id)
 
     setSaving(false)
@@ -330,6 +358,16 @@ function EditSaleModal({ sale, onClose, onSaved }: { sale: SaleRow; onClose: () 
             <option value="pos">POS</option>
             <option value="credit">Credit (pay later)</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--ink-soft)' }}>Discount (%)</label>
+          <input type="number" min={0} max={100} step="0.01" value={discount} onChange={(e) => changeDiscount(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)' }} />
+          {itemsSubtotal > 0 && (
+            <p className="text-xs mt-1" style={{ color: 'var(--ink-soft)' }}>
+              Items total before discount: ₦{itemsSubtotal.toLocaleString('en-NG')}. Changing the discount updates the total below.
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -401,6 +439,7 @@ function NewSaleModal({ isCeo, defaultStoreId, stores, soldBy, onClose, onSaved 
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [discount, setDiscount] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -430,7 +469,11 @@ function NewSaleModal({ isCeo, defaultStoreId, stores, soldBy, onClose, onSaved 
     setCart((prev) => prev.filter((l) => l.product.id !== productId))
   }
 
-  const total = cart.reduce((sum, l) => sum + l.quantity * Number(l.product.selling_price), 0)
+  const money2 = (n: number) => `₦${Number(n).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const subtotal = cart.reduce((sum, l) => sum + l.quantity * Number(l.product.selling_price), 0)
+  const discountPct = Math.min(100, Math.max(0, Number(discount) || 0))
+  const discountAmount = Math.round(subtotal * discountPct) / 100
+  const total = Math.round((subtotal - discountAmount) * 100) / 100
 
   async function submit() {
     setError(null)
@@ -456,6 +499,7 @@ function NewSaleModal({ isCeo, defaultStoreId, stores, soldBy, onClose, onSaved 
         payment_method: paymentMethod,
         total_amount: total,
         amount_paid: amountPaid,
+        ...(discountPct > 0 ? { discount_percent: discountPct } : {}),
       })
       .select()
       .single()
@@ -566,6 +610,23 @@ function NewSaleModal({ isCeo, defaultStoreId, stores, soldBy, onClose, onSaved 
           </div>
         )}
 
+        {cart.length > 0 && (
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <label className="text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>Discount (%) — leave empty for none</label>
+            <input
+              type="number" min={0} max={100} step="0.01" placeholder="0"
+              value={discount} onChange={(e) => setDiscount(e.target.value)}
+              className="w-24 rounded-lg border px-3 py-2 text-sm text-right font-mono-num" style={{ borderColor: 'var(--line)' }}
+            />
+          </div>
+        )}
+        {cart.length > 0 && discountPct > 0 && (
+          <div className="text-sm mb-3 space-y-1" style={{ color: 'var(--ink-soft)' }}>
+            <div className="flex justify-between"><span>Subtotal</span><span className="font-mono-num">{money2(subtotal)}</span></div>
+            <div className="flex justify-between"><span>Discount ({discountPct}%)</span><span className="font-mono-num">−{money2(discountAmount)}</span></div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-3">
           <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}
             className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--line)' }}>
@@ -672,6 +733,9 @@ function ReceiptModal({ saleId, onClose }: { saleId: string; onClose: () => void
   const total = sale ? Number(sale.total_amount) : 0
   const paid = sale ? Number(sale.amount_paid) : 0
   const balance = total - paid
+  const itemsSubtotal = items.reduce((sum, i) => sum + Number(i.subtotal), 0)
+  const discountPct = sale ? Number(sale.discount_percent) || 0 : 0
+  const discountAmt = Math.max(0, itemsSubtotal - total)
   const receiptNo = sale
     ? `RCT-${format(new Date(sale.created_at), 'yyMMdd')}-${sale.id.slice(0, 6).toUpperCase()}`
     : ''
@@ -770,6 +834,12 @@ function ReceiptModal({ saleId, onClose }: { saleId: string; onClose: () => void
               </table>
 
               <div style={{ borderTop: '1px dashed #999', marginTop: 8, paddingTop: 8, fontSize: 12 }}>
+                {discountPct > 0 && discountAmt > 0 && (
+                  <>
+                    <div className="flex justify-between"><span>Subtotal</span><span>{money(itemsSubtotal)}</span></div>
+                    <div className="flex justify-between" style={{ marginBottom: 4 }}><span>Discount ({discountPct}%)</span><span>−{money(discountAmt)}</span></div>
+                  </>
+                )}
                 <div className="flex justify-between" style={{ fontSize: 15, fontWeight: 700 }}>
                   <span>TOTAL</span><span>{money(total)}</span>
                 </div>
